@@ -91,8 +91,8 @@ pthreads_socket_t* pthreads_socket_alloc(void) {
 }
 
 void pthreads_socket_construct(zval *object, zend_long domain, zend_long type, zend_long protocol) {
-	pthreads_object_t *threaded = 
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_object_t *threaded =
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	threaded->store.sock->fd = socket(domain, type, protocol);
 
@@ -108,9 +108,9 @@ void pthreads_socket_construct(zval *object, zend_long domain, zend_long type, z
 }
 
 void pthreads_socket_set_option(zval *object, zend_long level, zend_long name, zend_long value, zval *return_value) {
-	pthreads_object_t *threaded = 
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
-	
+	pthreads_object_t *threaded =
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
+
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 
 	if (setsockopt(threaded->store.sock->fd, level, name, (char*) &value, sizeof(value)) != SUCCESS) {
@@ -124,7 +124,7 @@ void pthreads_socket_set_option(zval *object, zend_long level, zend_long name, z
 
 void pthreads_socket_get_option(zval *object, zend_long level, zend_long name, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 	socklen_t unused = sizeof(zend_long);
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
@@ -156,8 +156,8 @@ static inline zend_bool pthreads_socket_set_inet_addr(pthreads_socket_t *sock, s
 					"Host lookup failed: Non AF_INET domain returned on AF_INET socket");
 			return 0;
 		}
-		
-		memcpy(&(sin->sin_addr.s_addr), hentry->h_addr_list[0], hentry->h_length);	
+
+		memcpy(&(sin->sin_addr.s_addr), hentry->h_addr_list[0], hentry->h_length);
 	}
 
 	return 1;
@@ -171,7 +171,7 @@ static inline int pthreads_socket_string_to_if_index(const char *val, unsigned *
 		*out = ind;
 		return SUCCESS;
 	}
-	
+
 	return FAILURE;
 #else
 	/* throw */
@@ -183,16 +183,16 @@ static inline zend_bool pthreads_socket_set_inet6_addr(pthreads_socket_t *sock, 
 	struct in6_addr tmp;
 #if HAVE_GETADDRINFO
 	struct addrinfo hints;
-	struct addrinfo *addrinfo = NULL;	
+	struct addrinfo *addrinfo = NULL;
 #endif
 	char *scope = strchr(ZSTR_VAL(address), '%');
-	
+
 	if (inet_pton(AF_INET6, ZSTR_VAL(address), &tmp)) {
 		memcpy(&(sin->sin6_addr.s6_addr), &(tmp.s6_addr), sizeof(struct in6_addr));
 	} else {
 #if HAVE_GETADDRINFO
 		memset(&hints, 0, sizeof(struct addrinfo));
-		
+
 		hints.ai_family = AF_INET6;
 #if HAVE_AI_V4MAPPED
 		hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG;
@@ -243,7 +243,7 @@ static inline zend_bool pthreads_socket_set_inet6_addr(pthreads_socket_t *sock, 
 
 void pthreads_socket_bind(zval *object, zend_string *address, zend_long port, zval *return_value) {
 	pthreads_object_t	*threaded =
-			PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+			PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 	php_sockaddr_storage	sa_storage = {0};
 	struct sockaddr		*sock_type = (struct sockaddr*) &sa_storage;
 	zend_long		retval = 0;
@@ -275,7 +275,7 @@ void pthreads_socket_bind(zval *object, zend_string *address, zend_long port, zv
 
 			sa->sin_family = AF_INET;
 			sa->sin_port = htons((unsigned short) port);
-			
+
 			if (!pthreads_socket_set_inet_addr(threaded->store.sock, sa, address)) {
 				RETURN_FALSE;
 			}
@@ -289,7 +289,7 @@ void pthreads_socket_bind(zval *object, zend_string *address, zend_long port, zv
 
 			sa->sin6_family = AF_INET6;
 			sa->sin6_port = htons((unsigned short) port);
-			
+
 			if (!pthreads_socket_set_inet6_addr(threaded->store.sock, sa, address)) {
 				RETURN_FALSE;
 			}
@@ -309,7 +309,7 @@ void pthreads_socket_bind(zval *object, zend_string *address, zend_long port, zv
 
 void pthreads_socket_listen(zval *object, zend_long backlog, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 
@@ -324,7 +324,7 @@ void pthreads_socket_listen(zval *object, zend_long backlog, zval *return_value)
 
 void pthreads_socket_accept(zval *object, zend_class_entry *ce, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 	pthreads_object_t *accepted;
 
 	php_sockaddr_storage sa;
@@ -348,7 +348,7 @@ void pthreads_socket_accept(zval *object, zend_class_entry *ce, zval *return_val
 	}
 	object_init_ex(return_value, ce);
 
-	accepted = PTHREADS_FETCH_FROM(Z_OBJ_P(return_value));
+	accepted = PTHREADS_FETCH_TS_FROM(Z_OBJ_P(return_value));
 	accepted->store.sock->fd = acceptedFd;
 	accepted->store.sock->blocking = 1;
 	accepted->store.sock->domain = ((struct sockaddr*) &sa)->sa_family;
@@ -356,7 +356,7 @@ void pthreads_socket_accept(zval *object, zend_class_entry *ce, zval *return_val
 
 void pthreads_socket_connect(zval *object, int argc, zend_string *address, zend_long port, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 	int retval;
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
@@ -394,7 +394,7 @@ void pthreads_socket_connect(zval *object, int argc, zend_string *address, zend_
 
 			sin.sin_family = AF_INET;
 			sin.sin_port   = htons((unsigned short int)port);
-			
+
 			if (!pthreads_socket_set_inet_addr(threaded->store.sock, &sin, address)) {
 				RETURN_FALSE;
 			}
@@ -497,7 +497,7 @@ static int pthreads_normal_read(pthreads_object_t *threaded, void *buf, size_t m
 
 void pthreads_socket_read(zval *object, zend_long length, zend_long flags, zend_long type, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 	zend_string *buf;
 	int bytes;
 
@@ -534,7 +534,7 @@ void pthreads_socket_read(zval *object, zend_long length, zend_long flags, zend_
 
 void pthreads_socket_write(zval *object, zend_string *buf, zend_long length, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 	int bytes;
@@ -554,13 +554,13 @@ void pthreads_socket_write(zval *object, zend_string *buf, zend_long length, zva
 
 		RETURN_FALSE;
 	}
-	
+
 	ZVAL_LONG(return_value, bytes);
 }
 
 void pthreads_socket_send(zval *object, zend_string *buf, zend_long length, zend_long flags, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 	int bytes;
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
@@ -578,7 +578,7 @@ void pthreads_socket_send(zval *object, zend_string *buf, zend_long length, zend
 
 void pthreads_socket_close(zval *object, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 
@@ -593,7 +593,7 @@ void pthreads_socket_close(zval *object, zval *return_value) {
 
 void pthreads_socket_set_blocking(zval *object, zend_bool blocking, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 
@@ -644,10 +644,10 @@ void pthreads_socket_get_sockaddr(zval *object, zend_long port, struct sockaddr 
 
 void pthreads_socket_get_peer_name(zval *object, zend_bool port, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
-	php_sockaddr_storage  sa_storage;
-    struct sockaddr     *sa = (struct sockaddr *) &sa_storage;
-	socklen_t            salen = sizeof(php_sockaddr_storage);
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
+	php_sockaddr_storage sa_storage;
+	struct sockaddr *sa = (struct sockaddr *) &sa_storage;
+	socklen_t salen = sizeof(php_sockaddr_storage);
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 
@@ -662,10 +662,10 @@ void pthreads_socket_get_peer_name(zval *object, zend_bool port, zval *return_va
 
 void pthreads_socket_get_sock_name(zval *object, zend_bool port, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 	php_sockaddr_storage  sa_storage;
-    struct sockaddr     *sa = (struct sockaddr *) &sa_storage;
-	socklen_t            salen = sizeof(php_sockaddr_storage);
+	struct sockaddr	 *sa = (struct sockaddr *) &sa_storage;
+	socklen_t			salen = sizeof(php_sockaddr_storage);
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 
@@ -695,7 +695,7 @@ static inline int pthreads_sockets_to_fd_set(zval *sockets, fd_set *fds, php_soc
 			continue;
 		}
 
-		threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(element));
+		threaded = PTHREADS_FETCH_TS_FROM(Z_OBJ_P(element));
 
 		PTHREADS_SOCKET_CHECK_EX(threaded->store.sock, 0);
 
@@ -727,12 +727,12 @@ static int pthreads_sockets_from_fd_set(zval *sockets, fd_set *fds) /* {{{ */
 	ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(sockets), idx, key, element) {
 		pthreads_object_t	*threaded;
 
-		if (Z_TYPE_P(element) != IS_OBJECT || 
+		if (Z_TYPE_P(element) != IS_OBJECT ||
 			!instanceof_function(Z_OBJCE_P(element), pthreads_socket_entry)) {
 			continue;
 		}
 
-		threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(element));
+		threaded = PTHREADS_FETCH_TS_FROM(Z_OBJ_P(element));
 
 		if (PHP_SAFE_FD_ISSET(threaded->store.sock->fd, fds)) {
 			if (key) {
@@ -854,7 +854,7 @@ void pthreads_socket_free(pthreads_socket_t *socket, zend_bool closing) {
 
 void pthreads_socket_recvfrom(zval *object, zval *buffer, zend_long len, zend_long flags, zval *name, zval *port, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	socklen_t			slen;
 	int					retval;
@@ -967,7 +967,7 @@ void pthreads_socket_recvfrom(zval *object, zval *buffer, zend_long len, zend_lo
 
 void pthreads_socket_sendto(zval *object, int argc, zend_string *buf, zend_long len, zend_long flags, zend_string *addr, zend_long port, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	int	retval;
 
@@ -1033,7 +1033,7 @@ void pthreads_socket_sendto(zval *object, int argc, zend_string *buf, zend_long 
 
 void pthreads_socket_get_last_error(zval *object, zend_bool clear, zval *return_value) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 
@@ -1058,7 +1058,7 @@ void pthreads_socket_strerror(zend_long error, zval *return_value) {
 
 void pthreads_socket_clear_error(zval *object) {
 	pthreads_object_t *threaded =
-		PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+		PTHREADS_FETCH_TS_FROM(Z_OBJ_P(object));
 
 	PTHREADS_SOCKET_CHECK(threaded->store.sock);
 	PTHREADS_CLEAR_SOCKET_ERROR(threaded->store.sock);

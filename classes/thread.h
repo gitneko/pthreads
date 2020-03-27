@@ -27,7 +27,7 @@ PHP_METHOD(Thread, getCurrentThread);
 PHP_METHOD(Thread, getCreatorId);
 
 ZEND_BEGIN_ARG_INFO_EX(Thread_start, 0, 0, 0)
-    ZEND_ARG_TYPE_INFO(0, options, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, options, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(Thread_run, 0, 0, 0)
@@ -58,8 +58,8 @@ ZEND_BEGIN_ARG_INFO_EX(Thread_isTerminated, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(Thread_merge, 0, 0, 1)
-    ZEND_ARG_INFO(0, from)
-    ZEND_ARG_TYPE_INFO(0, overwrite, _IS_BOOL, 0)
+	ZEND_ARG_INFO(0, from)
+	ZEND_ARG_TYPE_INFO(0, overwrite, _IS_BOOL, 0)
 ZEND_END_ARG_INFO()
 
 extern zend_function_entry pthreads_thread_methods[];
@@ -83,25 +83,25 @@ zend_function_entry pthreads_thread_methods[] = {
 		$options should be a mask of inheritance constants */
 PHP_METHOD(Thread, start)
 {
-	pthreads_object_t* thread = PTHREADS_FETCH;
+	pthreads_zend_object_t* thread = PTHREADS_FETCH;
 	zend_long options = PTHREADS_INHERIT_ALL;
-	
+
 	if (ZEND_NUM_ARGS()) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS(), "l", &options) != SUCCESS) {
 			return;
 		}
 
-		thread->options = options;
+		thread->ts_obj->options = options;
 	}
 
 	RETURN_BOOL(pthreads_start(thread));
 } /* }}} */
 
-/* {{{ proto Thread::isStarted() 
+/* {{{ proto Thread::isStarted()
 	Will return true if a Thread has been started */
 PHP_METHOD(Thread, isStarted)
 {
-	pthreads_object_t* thread = PTHREADS_FETCH;
+	pthreads_object_t* thread = PTHREADS_FETCH_TS;
 
 	RETURN_BOOL(pthreads_monitor_check(thread->monitor, PTHREADS_MONITOR_STARTED));
 } /* }}} */
@@ -110,16 +110,16 @@ PHP_METHOD(Thread, isStarted)
 	Will return true if a Thread has been joined already */
 PHP_METHOD(Thread, isJoined)
 {
-	pthreads_object_t* thread = PTHREADS_FETCH;
+	pthreads_object_t* thread = PTHREADS_FETCH_TS;
 
 	RETURN_BOOL(pthreads_monitor_check(thread->monitor, PTHREADS_MONITOR_JOINED));
 } /* }}} */
 
-/* {{{ proto boolean Thread::join() 
+/* {{{ proto boolean Thread::join()
 		Will return a boolean indication of success */
-PHP_METHOD(Thread, join) 
-{ 
-	pthreads_object_t* thread = PTHREADS_FETCH;
+PHP_METHOD(Thread, join)
+{
+	pthreads_zend_object_t* thread = PTHREADS_FETCH;
 
 	RETURN_BOOL(pthreads_join(thread));
 } /* }}} */
@@ -128,7 +128,7 @@ PHP_METHOD(Thread, join)
 	Will return the identifier of the referenced Thread */
 PHP_METHOD(Thread, getThreadId)
 {
-	ZVAL_LONG(return_value, (PTHREADS_FETCH_FROM(Z_OBJ_P(getThis())))->local.id);
+	ZVAL_LONG(return_value, (PTHREADS_FETCH_TS_FROM(Z_OBJ_P(getThis())))->local.id);
 } /* }}} */
 
 /* {{{ proto long Thread::getCurrentThreadId()
@@ -145,11 +145,11 @@ PHP_METHOD(Thread, getCurrentThread)
 	pthreads_current_thread(return_value);
 } /* }}} */
 
-/* {{{ proto long Thread::getCreatorId() 
+/* {{{ proto long Thread::getCreatorId()
 	Will return the identifier of the thread ( or process ) that created the referenced Thread */
 PHP_METHOD(Thread, getCreatorId)
 {
-	ZVAL_LONG(return_value, (PTHREADS_FETCH_FROM(Z_OBJ_P(getThis())))->creator.id);
+	ZVAL_LONG(return_value, (PTHREADS_FETCH_TS_FROM(Z_OBJ_P(getThis())))->creator.id);
 } /* }}} */
 #	endif
 #endif

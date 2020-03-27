@@ -28,12 +28,12 @@ struct _pthreads_globals {
 	* Initialized flag
 	*/
 	volatile zend_bool init;
-	
+
 	/*
 	* Failed flag
 	*/
 	zend_bool failed;
-	
+
 	/*
 	* Global Monitor
 	*/
@@ -43,12 +43,12 @@ struct _pthreads_globals {
 	* Global/Default Resource Destructor
 	*/
 	dtor_func_t (default_resource_dtor);
-	
+
 	/*
 	* Objects Cache
 	*/
 	HashTable objects;
-	
+
 	/*
 	* High Frequency Strings
 	*/
@@ -71,13 +71,13 @@ ZEND_EXTERN_MODULE_GLOBALS(pthreads)
 /* }}} */
 
 /* {{{ */
-zend_bool pthreads_globals_object_delete(void *address); /* }}} */
+zend_bool pthreads_globals_object_valid(pthreads_zend_object_t *address); /* }}} */
 
 /* {{{ */
-zend_bool pthreads_globals_object_connect(zend_ulong address, zend_class_entry *ce, zval *object); /* }}} */
+zend_bool pthreads_globals_object_delete(pthreads_zend_object_t *address); /* }}} */
 
 /* {{{ */
-void* pthreads_globals_object_alloc(size_t length); /* }}} */
+pthreads_zend_object_t* pthreads_globals_object_alloc(size_t length); /* }}} */
 
 /* {{{ initialize (true) globals */
 zend_bool pthreads_globals_init(); /* }}} */

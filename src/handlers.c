@@ -47,7 +47,7 @@ int pthreads_count_properties(PTHREADS_COUNT_PASSTHRU_D) {
 
 /* {{{ */
 int pthreads_count_properties_disallow(PTHREADS_COUNT_PASSTHRU_D) {
-	pthreads_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	zend_throw_exception_ex(spl_ce_RuntimeException, 0,
 		"%s objects are not allowed to have properties",
@@ -59,39 +59,24 @@ int pthreads_count_properties_disallow(PTHREADS_COUNT_PASSTHRU_D) {
 /* {{{ */
 HashTable* pthreads_read_debug(PTHREADS_READ_DEBUG_PASSTHRU_D) {
 	HashTable *table = emalloc(sizeof(HashTable));
-	pthreads_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	zend_hash_init(table, 8, NULL, ZVAL_PTR_DTOR, 0);
 	*is_temp = 1;
 
-	if (!PTHREADS_IS_SOCKET(threaded)) {
-		pthreads_store_tohash(object, table);
-	}
+	pthreads_store_tohash(object, table);
 
 	return table;
 } /* }}} */
 
 /* {{{ */
 HashTable* pthreads_read_properties(PTHREADS_READ_PROPERTIES_PASSTHRU_D) {
-	pthreads_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	rebuild_object_properties(&threaded->std);
 
 	pthreads_store_tohash(
 		object, threaded->std.properties);
-		
-	return threaded->std.properties;
-} /* }}} */
-
-/* {{{ */
-HashTable* pthreads_read_properties_disallow(PTHREADS_READ_PROPERTIES_PASSTHRU_D) {
-	pthreads_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
-
-	rebuild_object_properties(&threaded->std);
-
-	zend_throw_exception_ex(spl_ce_RuntimeException, 0,
-		"%s objects are not allowed to have properties",
-		ZSTR_VAL(threaded->std.ce->name));
 
 	return threaded->std.properties;
 } /* }}} */
@@ -99,14 +84,14 @@ HashTable* pthreads_read_properties_disallow(PTHREADS_READ_PROPERTIES_PASSTHRU_D
 /* {{{ */
 zval * pthreads_read_property (PTHREADS_READ_PROPERTY_PASSTHRU_D) {
 	zend_guard *guard = NULL;
-	pthreads_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	rebuild_object_properties(&threaded->std);
 
 	if (Z_OBJCE_P(object)->__get && (guard = pthreads_get_guard(&threaded->std, member)) && !((*guard) & IN_GET)) {
 		zend_fcall_info fci = empty_fcall_info;
-        zend_fcall_info_cache fcc = empty_fcall_info_cache;
-		
+		zend_fcall_info_cache fcc = empty_fcall_info_cache;
+
 		fci.size = sizeof(zend_fcall_info);
 		fci.retval = rv;
 		fci.object = &threaded->std;
@@ -116,7 +101,7 @@ zval * pthreads_read_property (PTHREADS_READ_PROPERTY_PASSTHRU_D) {
 #endif
 		fcc.function_handler = Z_OBJCE_P(object)->__get;
 		fcc.object = &threaded->std;
-		
+
 		(*guard) |= IN_GET;
 		zend_call_function(&fci, &fcc);
 		(*guard) &= ~IN_GET;
@@ -125,30 +110,30 @@ zval * pthreads_read_property (PTHREADS_READ_PROPERTY_PASSTHRU_D) {
 	} else {
 		pthreads_store_read(object, member, type, rv);
 	}
-	
+
 	return rv;
-} 
+}
 
 zval* pthreads_read_dimension(PTHREADS_READ_DIMENSION_PASSTHRU_D) { return pthreads_read_property(PTHREADS_READ_DIMENSION_PASSTHRU_C); }
 /* }}} */
 
 /* {{{ */
 zval * pthreads_read_property_disallow (PTHREADS_READ_PROPERTY_PASSTHRU_D) {
-	pthreads_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	zend_throw_exception_ex(spl_ce_RuntimeException, 0,
 		"%s objects are not allowed to have properties",
 		ZSTR_VAL(threaded->std.ce->name));
-	
+
 	return &EG(uninitialized_zval);
-} 
+}
 
 zval* pthreads_read_dimension_disallow(PTHREADS_READ_DIMENSION_PASSTHRU_D) { return pthreads_read_property_disallow(PTHREADS_READ_DIMENSION_PASSTHRU_C); }
 /* }}} */
 
 /* {{{ */
 void pthreads_write_property(PTHREADS_WRITE_PROPERTY_PASSTHRU_D) {
-	pthreads_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	rebuild_object_properties(&threaded->std);
 
@@ -164,8 +149,8 @@ void pthreads_write_property(PTHREADS_WRITE_PROPERTY_PASSTHRU_D) {
 		case IS_TRUE:
 		case IS_FALSE: {
 			zend_guard *guard = NULL;
-			if ((member && Z_TYPE_P(member) != IS_NULL) && 
-				Z_OBJCE_P(object)->__set && 
+			if ((member && Z_TYPE_P(member) != IS_NULL) &&
+				Z_OBJCE_P(object)->__set &&
 				(guard = pthreads_get_guard(&threaded->std, member)) && !((*guard) & IN_SET)) {
 				zend_fcall_info fci = empty_fcall_info;
 				zend_fcall_info_cache fcc = empty_fcall_info_cache;
@@ -194,12 +179,12 @@ void pthreads_write_property(PTHREADS_WRITE_PROPERTY_PASSTHRU_D) {
 				pthreads_store_write(object, member, value);
 			}
 		} break;
-	
+
 		default: {
 			zend_throw_exception_ex(
 				spl_ce_RuntimeException, 0,
-				"pthreads detected an attempt to use unsupported data (%s) for %s::$%s", 
-				zend_get_type_by_const(Z_TYPE_P(value)), 
+				"pthreads detected an attempt to use unsupported data (%s) for %s::$%s",
+				zend_get_type_by_const(Z_TYPE_P(value)),
 				ZSTR_VAL(Z_OBJCE_P(object)->name), Z_STRVAL_P(member));
 		}
 	}
@@ -210,7 +195,7 @@ void pthreads_write_dimension(PTHREADS_WRITE_DIMENSION_PASSTHRU_D) { pthreads_wr
 
 /* {{{ */
 void pthreads_write_property_disallow(PTHREADS_WRITE_PROPERTY_PASSTHRU_D) {
-	pthreads_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	zend_throw_exception_ex(spl_ce_RuntimeException, 0,
 		"%s objects are not allowed to have properties",
@@ -224,7 +209,7 @@ void pthreads_write_dimension_disallow(PTHREADS_WRITE_DIMENSION_PASSTHRU_D) { pt
 int pthreads_has_property(PTHREADS_HAS_PROPERTY_PASSTHRU_D) {
 	int isset = 0;
 	zend_guard *guard = NULL;
-	pthreads_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	cache = NULL;
 
@@ -248,9 +233,9 @@ int pthreads_has_property(PTHREADS_HAS_PROPERTY_PASSTHRU_D) {
 		(*guard) |= IN_ISSET;
 		zend_call_function(&fci, &fcc);
 		(*guard) &= ~IN_ISSET;
-	
+
 		if (Z_TYPE(rv) != IS_UNDEF) {
-			isset = 
+			isset =
 				zend_is_true(&rv);
 			zval_dtor(&rv);
 		}
@@ -266,7 +251,7 @@ int pthreads_has_dimension(PTHREADS_HAS_DIMENSION_PASSTHRU_D) { return pthreads_
 
 /* {{{ */
 int pthreads_has_property_disallow(PTHREADS_HAS_PROPERTY_PASSTHRU_D) {
-	pthreads_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	zend_throw_exception_ex(spl_ce_RuntimeException, 0,
 		"%s objects are not allowed to have properties",
@@ -281,7 +266,7 @@ int pthreads_has_dimension_disallow(PTHREADS_HAS_DIMENSION_PASSTHRU_D) { return 
 /* {{{ */
 void pthreads_unset_property(PTHREADS_UNSET_PROPERTY_PASSTHRU_D) {
 	zend_guard *guard = NULL;
-	pthreads_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	cache = NULL;
 
@@ -307,14 +292,14 @@ void pthreads_unset_property(PTHREADS_UNSET_PROPERTY_PASSTHRU_D) {
 		(*guard) |= IN_UNSET;
 		zend_call_function(&fci, &fcc);
 		(*guard) &= ~IN_UNSET;
-	
+
 		if (Z_TYPE(rv) != IS_UNDEF) {
 			zval_dtor(&rv);
 		}
 		zend_fcall_info_args_clear(&fci, 1);
 	} else {
 		if (pthreads_store_delete(object, member) == SUCCESS){
-			
+
 		}
 	}
 }
@@ -323,7 +308,7 @@ void pthreads_unset_dimension(PTHREADS_UNSET_DIMENSION_PASSTHRU_D) { pthreads_un
 
 /* {{{ */
 void pthreads_unset_property_disallow(PTHREADS_UNSET_PROPERTY_PASSTHRU_D) {
-	pthreads_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
+	pthreads_zend_object_t* threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(object));
 
 	zend_throw_exception_ex(spl_ce_RuntimeException, 0,
 		"%s objects are not allowed to have properties",
@@ -334,40 +319,21 @@ void pthreads_unset_dimension_disallow(PTHREADS_UNSET_DIMENSION_PASSTHRU_D) { pt
 
 /* {{{ */
 int pthreads_cast_object(PTHREADS_CAST_PASSTHRU_D) {
-	pthreads_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(from));
-	if (PTHREADS_IS_SOCKET(threaded)) {
-		if (type == IS_LONG) {
-			ZVAL_LONG(to, 
-				(int) threaded->options);
+	pthreads_zend_object_t *threaded = PTHREADS_FETCH_FROM(Z_OBJ_P(from));
+	switch (type) {
+		case IS_ARRAY: {
+			pthreads_store_tohash(from, Z_ARRVAL_P(to));
 			return SUCCESS;
-		}
-		return FAILURE;
+		} break;
 	}
 
-    switch (type) {
-        case IS_ARRAY: {
-            pthreads_store_tohash(from, Z_ARRVAL_P(to));
-            return SUCCESS;
-        } break;
-    }
-    
-    return zend_handlers->cast_object(PTHREADS_CAST_PASSTHRU_C);
-} /* }}} */
-
-/* {{{ */
-zend_object* pthreads_clone_object(PTHREADS_CLONE_PASSTHRU_D)
-{
-	zend_throw_exception_ex(
-			spl_ce_RuntimeException, 0, 
-			"pthreads objects cannot be cloned");
-	
-	return NULL;
+	return zend_handlers->cast_object(PTHREADS_CAST_PASSTHRU_C);
 } /* }}} */
 
 /* {{{ */
 int pthreads_compare_objects(PTHREADS_COMPARE_PASSTHRU_D) {
-	pthreads_object_t *left = PTHREADS_FETCH_FROM(Z_OBJ_P(op1));
-	pthreads_object_t *right = PTHREADS_FETCH_FROM(Z_OBJ_P(op2));
+	pthreads_object_t *left = PTHREADS_FETCH_TS_FROM(Z_OBJ_P(op1));
+	pthreads_object_t *right = PTHREADS_FETCH_TS_FROM(Z_OBJ_P(op2));
 
 	/* comparing property tables is not useful or efficient for threaded objects */
 	/* in addition, it might be useful to know if two variables are infact the same physical threaded object */

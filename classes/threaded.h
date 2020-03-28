@@ -130,9 +130,21 @@ PHP_METHOD(Threaded, wait)
 {
 	pthreads_object_t* threaded = PTHREADS_FETCH_TS;
 	zend_long timeout = 0L;
+	int retval;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|l", &timeout)==SUCCESS) {
-		RETURN_BOOL(pthreads_monitor_wait(threaded->monitor, timeout) == SUCCESS);
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "|l", &timeout)!=SUCCESS) {
+		return;
+	}
+
+	retval = pthreads_monitor_wait(threaded->monitor, timeout);
+	switch (retval) {
+		case SUCCESS:
+			RETURN_TRUE;
+		case ETIMEDOUT:
+			RETURN_FALSE;
+		default:
+			zend_throw_exception_ex(spl_ce_RuntimeException, retval, "Unexpected error (code %d) occurred during wait()", retval);
+			return;
 	}
 } /* }}} */
 

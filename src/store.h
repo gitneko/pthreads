@@ -30,6 +30,10 @@
 
 #define TRY_PTHREADS_STORAGE_PTR_P(zval) ((zval) != NULL && Z_TYPE_P(zval) == IS_PTR ? (pthreads_storage *) Z_PTR_P(zval) : NULL)
 
+#if PHP_VERSION_ID < 80000
+typedef int zend_result;
+#endif
+
 pthreads_store_t* pthreads_store_alloc();
 void pthreads_store_sync_local_properties(pthreads_zend_object_t *threaded);
 int pthreads_store_merge(zend_object *destination, zval *from, zend_bool overwrite, zend_bool coerce_array_to_threaded);

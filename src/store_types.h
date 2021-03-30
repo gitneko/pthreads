@@ -26,7 +26,6 @@ typedef enum _pthreads_store_type {
 	STORE_TYPE_CLOSURE,
 	STORE_TYPE_PTHREADS,
 	STORE_TYPE_RESOURCE,
-	STORE_TYPE_OBJECT,
 	STORE_TYPE_ARRAY
 } pthreads_store_type;
 

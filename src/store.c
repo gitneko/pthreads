@@ -351,7 +351,10 @@ int pthreads_store_write(zend_object *object, zval *key, zval *write, zend_bool 
 		rebuild_object_properties(Z_OBJ_P(write));
 	}
 
-	pthreads_store_save_zval(&zstorage, write);
+	if (pthreads_store_save_zval(&zstorage, write) != SUCCESS) {
+		zend_throw_error(zend_ce_error, "Unsupported data type");
+		return FAILURE;
+	}
 
 	if (pthreads_monitor_lock(ts_obj->monitor)) {
 		if (!key) {
@@ -666,14 +669,15 @@ static pthreads_storage* pthreads_store_create(zval *unstore){
 				storage->data = threaded;
 				break;
 			}
-			storage->type = STORE_TYPE_OBJECT;
 
-		/* break intentionally omitted */
+			/* non-threaded, non-closure objects cannot be copied */
+			free(storage);
+			storage = NULL;
+			break;
+
 		case IS_ARRAY: if (pthreads_store_tostring(unstore, (char**) &storage->data, &storage->length)==SUCCESS) {
-			if (Z_TYPE_P(unstore) == IS_ARRAY) {
-				storage->exists = zend_hash_num_elements(Z_ARRVAL_P(unstore));
-				storage->type = STORE_TYPE_ARRAY;
-			}
+			storage->exists = zend_hash_num_elements(Z_ARRVAL_P(unstore));
+			storage->type = STORE_TYPE_ARRAY;
 		} break;
 		default:
 			ZEND_ASSERT(0);
@@ -684,7 +688,8 @@ static pthreads_storage* pthreads_store_create(zval *unstore){
 /* }}} */
 
 /* {{{ */
-void pthreads_store_save_zval(zval *zstorage, zval *write) {
+zend_result pthreads_store_save_zval(zval *zstorage, zval *write) {
+	zend_result result = FAILURE;
 	switch (Z_TYPE_P(write)) {
 		case IS_NULL:
 		case IS_FALSE:
@@ -692,6 +697,7 @@ void pthreads_store_save_zval(zval *zstorage, zval *write) {
 		case IS_LONG:
 		case IS_DOUBLE:
 			ZVAL_COPY(zstorage, write);
+			result = SUCCESS;
 			break;
 		case IS_STRING:
 			if (GC_FLAGS(Z_STR_P(write)) & IS_STR_PERMANENT) { //interned by OPcache, or provided by builtin class
@@ -699,12 +705,19 @@ void pthreads_store_save_zval(zval *zstorage, zval *write) {
 			} else {
 				ZVAL_STR(zstorage, zend_string_init(Z_STRVAL_P(write), Z_STRLEN_P(write), 1));
 			}
+			result = SUCCESS;
 			break;
-		default:
-			//TODO: what if this fails?
-			ZVAL_PTR(zstorage, pthreads_store_create(write));
-			break;
+		default: {
+			pthreads_storage *storage = pthreads_store_create(write);
+			if (storage != NULL) {
+				ZVAL_PTR(zstorage, pthreads_store_create(write));
+				result = SUCCESS;
+			} else {
+				result = FAILURE;
+			}
+		} break;
 	}
+	return result;
 } /* }}} */
 
 /* {{{ */
@@ -770,7 +783,6 @@ static int pthreads_store_convert(pthreads_storage *storage, zval *pzval){
 			}
 		} break;
 
-		case STORE_TYPE_OBJECT:
 		case STORE_TYPE_ARRAY:
 			result = pthreads_store_tozval(pzval, (char*) storage->data, storage->length);
 		break;
@@ -835,7 +847,6 @@ static void pthreads_store_hard_copy_storage(zval *new_zstorage, zval *zstorage)
 		memcpy(copy, storage, sizeof(pthreads_storage));
 
 		switch (copy->type) {
-			case STORE_TYPE_OBJECT:
 			case STORE_TYPE_ARRAY: if (storage->length) {
 				copy->data = (char*) malloc(copy->length+1);
 				if (!copy->data) {
@@ -1151,7 +1162,6 @@ void pthreads_store_storage_dtor (zval *zstorage){
 		pthreads_storage *storage = (pthreads_storage *) Z_PTR_P(zstorage);
 		switch (storage->type) {
 			case STORE_TYPE_CLOSURE:
-			case STORE_TYPE_OBJECT:
 			case STORE_TYPE_ARRAY:
 			case STORE_TYPE_RESOURCE:
 				if (storage->data) {

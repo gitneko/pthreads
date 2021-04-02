@@ -44,11 +44,6 @@
 
 
 /* {{{ */
-static int pthreads_store_tostring(zval *pzval, char **pstring, size_t *slength);
-static int pthreads_store_tozval(zval *pzval, char *pstring, size_t slength);
-/* }}} */
-
-/* {{{ */
 pthreads_store_t* pthreads_store_alloc() {
 	pthreads_store_t *store = (pthreads_store_t*) calloc(1, sizeof(pthreads_store_t));
 
@@ -229,13 +224,6 @@ zend_bool pthreads_store_isset(zend_object *object, zval *key, int has_set_exist
 							isset = 0;
 						}
 						break;
-					case IS_PTR: {
-							/* serialized array, serialized object, Threaded object, or resource */
-							pthreads_storage *serialized = (pthreads_storage *) Z_PTR_P(zstorage);
-							if (serialized->type == STORE_TYPE_ARRAY && serialized->exists == 0) {
-								isset = 0;
-							}
-						} break;
 					case IS_ARRAY:
 						if (zend_hash_num_elements(Z_ARRVAL_P(zstorage)) == 0) {
 							isset = 0;
@@ -670,18 +658,11 @@ static pthreads_storage* pthreads_store_create(zval *unstore){
 				break;
 			}
 
-			/* non-threaded, non-closure objects cannot be copied */
+			/* fallthru to default, non-threaded, non-closure objects cannot be stored */
+		default:
 			free(storage);
 			storage = NULL;
 			break;
-
-		case IS_ARRAY: if (pthreads_store_tostring(unstore, (char**) &storage->data, &storage->length)==SUCCESS) {
-			storage->exists = zend_hash_num_elements(Z_ARRVAL_P(unstore));
-			storage->type = STORE_TYPE_ARRAY;
-		} break;
-		default:
-			ZEND_ASSERT(0);
-
 	}
 	return storage;
 }
@@ -783,10 +764,6 @@ static int pthreads_store_convert(pthreads_storage *storage, zval *pzval){
 			}
 		} break;
 
-		case STORE_TYPE_ARRAY:
-			result = pthreads_store_tozval(pzval, (char*) storage->data, storage->length);
-		break;
-
 		default: ZEND_ASSERT(0);
 	}
 
@@ -821,7 +798,7 @@ void pthreads_store_restore_zval_ex(zval *unstore, zval *zstorage, zend_bool *wa
 			break;
 		case IS_PTR:
 			{
-				/* threaded object, serialized object, resource, serialized array */
+				/* threaded object, serialized object, resource */
 				pthreads_storage *storage = (pthreads_storage *) Z_PTR_P(zstorage);
 				*was_pthreads_storage = storage->type == STORE_TYPE_PTHREADS;
 				pthreads_store_convert(storage, unstore);
@@ -846,17 +823,8 @@ static void pthreads_store_hard_copy_storage(zval *new_zstorage, zval *zstorage)
 
 		memcpy(copy, storage, sizeof(pthreads_storage));
 
-		switch (copy->type) {
-			case STORE_TYPE_ARRAY: if (storage->length) {
-				copy->data = (char*) malloc(copy->length+1);
-				if (!copy->data) {
-					break;
-				}
-				memcpy(copy->data, (const void*) storage->data, copy->length);
-				((char *)copy->data)[copy->length] = 0;
-			} break;
-			default: break;
-		}
+		//if we add new store types, their internal data might need to be copied here
+
 		ZVAL_PTR(new_zstorage, copy);
 	} else if (Z_TYPE_P(zstorage) == IS_STRING) {
 		ZVAL_STR(new_zstorage, zend_string_init(Z_STRVAL_P(zstorage), Z_STRLEN_P(zstorage), 1));
@@ -966,72 +934,6 @@ int pthreads_store_separate(zval * pzval, zval *separated) {
 		return FAILURE;
 	}
 	return SUCCESS;
-} /* }}} */
-
-/* {{{ */
-static int pthreads_store_tostring(zval *pzval, char **pstring, size_t *slength) {
-	int result = FAILURE;
-	if (pzval && (Z_TYPE_P(pzval) != IS_NULL)) {
-		smart_str smart;
-		memset(&smart, 0, sizeof(smart_str));
-
-		php_serialize_data_t vars;
-
-		PHP_VAR_SERIALIZE_INIT(vars);
-		php_var_serialize(&smart, pzval, &vars);
-		PHP_VAR_SERIALIZE_DESTROY(vars);
-
-		if (EG(exception)) {
-			smart_str_free(&smart);
-
-			*pstring = NULL;
-			*slength = 0;
-			return FAILURE;
-		}
-
-		if (smart.s) {
-			*slength = smart.s->len;
-			if (*slength) {
-				*pstring = malloc(*slength+1);
-				if (*pstring) {
-					memcpy(
-						(char*) *pstring, (const void*) smart.s->val, smart.s->len
-					);
-					(*pstring)[*slength] = 0;
-					result = SUCCESS;
-				}
-			} else *pstring = NULL;
-		}
-
-		smart_str_free(&smart);
-	} else {
-		*slength = 0;
-		*pstring = NULL;
-	}
-	return result;
-} /* }}} */
-
-/* {{{ */
-static int pthreads_store_tozval(zval *pzval, char *pstring, size_t slength) {
-	int result = SUCCESS;
-
-	if (pstring) {
-		const unsigned char* pointer = (const unsigned char*) pstring;
-
-		if (pointer) {
-			php_unserialize_data_t vars;
-
-			PHP_VAR_UNSERIALIZE_INIT(vars);
-			if (!php_var_unserialize(pzval, &pointer, pointer+slength, &vars)) {
-				result = FAILURE;
-			} else if (Z_REFCOUNTED_P(pzval)) {
-				gc_check_possible_root(Z_COUNTED_P(pzval));
-			}
-			PHP_VAR_UNSERIALIZE_DESTROY(vars);
-		} else result = FAILURE;
-	} else result = FAILURE;
-
-	return result;
 } /* }}} */
 
 /* {{{ */
@@ -1162,7 +1064,6 @@ void pthreads_store_storage_dtor (zval *zstorage){
 		pthreads_storage *storage = (pthreads_storage *) Z_PTR_P(zstorage);
 		switch (storage->type) {
 			case STORE_TYPE_CLOSURE:
-			case STORE_TYPE_ARRAY:
 			case STORE_TYPE_RESOURCE:
 				if (storage->data) {
 					free(storage->data);
